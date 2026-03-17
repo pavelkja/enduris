@@ -965,3 +965,181 @@ Po ověření MVP lze postupně přidávat:
 - real-time activity updates
 
 Architektura aplikace je navržena tak, aby tyto funkce bylo možné přidávat bez zásahu do existujících dat.
+
+
+
+Tohle je shrnutí ze dne 17.3.2026, kde už jsme vytvořili celou řadu náležitostí:
+# Enduris.app – Backend & Analytics Overview
+
+## 🎯 Vision
+
+Enduris.app je webová aplikace zaměřená na analýzu sportovních aktivit (Strava) s cílem poskytovat smysluplné insighty o výkonnosti, konzistenci a dlouhodobém vývoji kondice.
+
+Cílem není zobrazovat pouze data, ale interpretovat je:
+→ co se děje s výkonností a proč.
+
+---
+
+## 🧱 Technologie
+
+- Backend: FastAPI (Python)
+- Databáze: PostgreSQL (Neon)
+- ORM: SQLAlchemy
+- Data source: Strava API
+
+---
+
+## 📊 Datový model
+
+### Tables
+
+- `users`
+- `activities`
+- `activity_streams`
+- `activity_metrics`
+- `daily_metrics`
+
+---
+
+## ⚙️ Metrics Engine
+
+- metriky implementovány jako pluginy (`app/metrics/`)
+- ukládání do `activity_metrics`
+- UNIQUE (activity_id, metric_name)
+- UPSERT (idempotentní výpočty)
+
+### Implementované metriky:
+
+- efficiency
+- hr_drift
+- avg_hr_percent
+- aerobic_decoupling
+
+---
+
+## 📈 Trend Analytics
+
+### 1) Time-based (daily_metrics)
+
+- agregace po dnech
+- rolling averages:
+  - 7 dní
+  - 14 dní
+
+Použití:
+- dlouhodobý přehled
+- sezónní trendy
+
+---
+
+### 2) Activity-based (hlavní přístup)
+
+- výpočty přes SQL window functions
+- rolling:
+  - last 5 aktivit
+  - last 10 aktivit
+
+Důvod:
+→ přesnější než časové okno (uživatel trénuje nepravidelně)
+
+---
+
+## 🧩 Segmentace
+
+Používá se `sport_type` ze Strava API:
+
+- Ride
+- MountainBikeRide
+- GravelRide
+- VirtualRide
+- Run
+- TrailRun
+
+👉 žádná heuristika (speed apod.)  
+→ vyhnutí se chybné klasifikaci
+
+---
+
+## 🧠 Interpretace dat (Insight Engine – v základu)
+
+### Trend
+
+- improving
+- declining
+- stable
+
+→ založeno na rozdílu last_5 vs last_10  
+→ s thresholdem (eliminace šumu)
+
+---
+
+### Confidence
+
+- low (<5 aktivit)
+- medium (5–9 aktivit)
+- high (10+ aktivit)
+
+→ určuje spolehlivost trendu
+
+---
+
+### Variability
+
+- very_stable
+- stable
+- volatile
+
+→ založeno na standard deviation (efficiency)
+
+---
+
+## 🔌 API Endpoints
+
+### `/dashboard/health`
+- time-based trend (daily_metrics)
+
+### `/dashboard/efficiency-trend`
+- activity-based trend
+- vrací:
+  - trend
+  - confidence
+  - variability
+  - data
+
+### `/dashboard/sport-types`
+- seznam dostupných sportů pro uživatele
+
+---
+
+## 🧠 Klíčové principy návrhu
+
+- nemíchat různé sporty → segmentace
+- raději méně dat, ale kvalitních
+- activity-based analýza > time-based
+- oddělení:
+  - data (DB)
+  - výpočty (services)
+  - API (routers)
+
+---
+
+## 🚧 Další kroky
+
+- Insight layer (lidské interpretace)
+- fatigue detection
+- kombinace metrik (HR drift + efficiency)
+- UI dashboard
+- personalizace
+
+---
+
+## 🔥 Aktuální stav
+
+Projekt obsahuje funkční analytický backend, který:
+
+- zpracovává Strava data
+- počítá pokročilé metriky
+- analyzuje trendy výkonnosti
+- rozlišuje kvalitu signálu (confidence, variability)
+
+→ připraveno pro další vrstvu: interpretace a UI
