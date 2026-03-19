@@ -27,7 +27,7 @@ def refresh_access_token(db: Session, user: User):
         "refresh_token": user.refresh_token
     }
 
-    response = requests.post(url, data=data)
+    response = requests.post(url, data=data, timeout=(5, 30))
 
     if response.status_code != 200:
         print("❌ Token refresh failed:", response.text)
@@ -59,7 +59,7 @@ def fetch_streams(db: Session, user: User, activity_id):
         "Authorization": f"Bearer {user.access_token}"
     }
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params, timeout=(5, 30))
 
     # 🔥 401 → refresh token
     if response.status_code == 401:
@@ -71,7 +71,7 @@ def fetch_streams(db: Session, user: User, activity_id):
             return None
 
         headers["Authorization"] = f"Bearer {new_token}"
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=(5, 30))
 
     # 🔥 RATE LIMIT → STOP
     if response.status_code == 429:

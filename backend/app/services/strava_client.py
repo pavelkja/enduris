@@ -31,7 +31,7 @@ def get_athlete_activities(access_token, page=1, per_page=30, after=None):
     if after:
         params["after"] = after
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params, timeout=(5, 30))
 
     response.raise_for_status()
 

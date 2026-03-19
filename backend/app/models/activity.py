@@ -41,8 +41,6 @@ class Activity(Base):
 
     # metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    streams_imported = Column(Boolean, default=False)
     
     user = relationship("User", back_populates="activities")
     
