@@ -135,6 +135,10 @@ Server stáhne pouze nové aktivity.
 
 # Datový model
 
+## Project structure
+
+backend/ – FastAPI backend (main application)
+
 ## Users
 
 | field | type |
