@@ -20,8 +20,7 @@ def main():
 
         imported = import_activities(
             db=db,
-            user_id=user.id,
-            access_token=user.access_token
+            user_id=user.id
         )
 
         print(f"Import finished. Imported {imported} activities.")
