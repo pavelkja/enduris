@@ -72,6 +72,18 @@ def import_activities(db: Session, user_id):
         print(f"Activities received: {len(activities)}")
 
         for act in activities:
+            avg_heartrate = act.get("average_heartrate")
+            max_heartrate = act.get("max_heartrate")
+            strava_has_heartrate = bool(act.get("has_heartrate"))
+            has_heartrate = avg_heartrate is not None or max_heartrate is not None
+
+            if not strava_has_heartrate and has_heartrate:
+                print(
+                    f"Activity {act.get('id')} has HR data despite Strava has_heartrate=False "
+                    f"(avg={avg_heartrate}, max={max_heartrate})"
+                )
+
+            
             start_date_raw = act.get("start_date")
             start_date = None
 
@@ -90,7 +102,7 @@ def import_activities(db: Session, user_id):
                 continue
 
             # filtrovat aktivity bez HR
-            if not act.get("has_heartrate"):
+            if not has_heartrate:
                 continue
 
             if start_date is None:
@@ -111,8 +123,9 @@ def import_activities(db: Session, user_id):
                 elevation_gain=act.get("total_elevation_gain"),
                 avg_speed=act.get("average_speed"),
                 max_speed=act.get("max_speed"),
-                avg_hr=act.get("average_heartrate"),
-                max_hr=act.get("max_heartrate")
+                avg_hr=avg_heartrate,
+                max_hr=max_heartrate,
+                has_heartrate=has_heartrate,
             )
 
             db.merge(activity)
