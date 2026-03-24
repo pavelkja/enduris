@@ -17,7 +17,7 @@ SUPPORTED_SPORTS = {
 }
 
 
-def import_activities(db: Session, user_id, access_token: str):
+def import_activities(db: Session, user_id):
 
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -42,10 +42,12 @@ def import_activities(db: Session, user_id, access_token: str):
         print(f"Fetching page {page}")
 
         activities = get_athlete_activities(
-            access_token,
+            user.access_token,
             page=page,
             per_page=per_page,
-            after=after_timestamp
+            after=after_timestamp,
+            db=db,
+            user=user
         )
 
         # konec pagination
