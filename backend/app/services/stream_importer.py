@@ -1,5 +1,4 @@
 import requests
-import os
 from sqlalchemy.orm import Session
 
 from app.models.activity import Activity
@@ -7,42 +6,13 @@ from app.models.activity_stream import ActivityStream
 from app.models.user import User
 
 from app.services.metrics_engine import compute_metrics
+from app.services.strava_client import refresh_access_token
 
 
 STRAVA_API = "https://www.strava.com/api/v3"
 
 
 STREAM_KEYS = "time,heartrate,altitude,latlng,cadence,distance"
-
-
-# 🔥 REFRESH TOKEN
-def refresh_access_token(db: Session, user: User):
-
-    url = "https://www.strava.com/oauth/token"
-
-    data = {
-        "client_id": os.getenv("STRAVA_CLIENT_ID"),
-        "client_secret": os.getenv("STRAVA_CLIENT_SECRET"),
-        "grant_type": "refresh_token",
-        "refresh_token": user.refresh_token
-    }
-
-    response = requests.post(url, data=data, timeout=(5, 30))
-
-    if response.status_code != 200:
-        print("❌ Token refresh failed:", response.text)
-        return None
-
-    tokens = response.json()
-
-    user.access_token = tokens["access_token"]
-    user.refresh_token = tokens["refresh_token"]
-
-    db.commit()
-
-    print("🔑 Token refreshed")
-
-    return user.access_token
 
 
 # 🔥 FETCH STREAMS
