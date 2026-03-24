@@ -31,7 +31,10 @@ def import_activities(db: Session, user_id):
     per_page = 30
     total_imported = 0
     total_fetched = 0
-    sync_started_at = datetime.now(timezone.utc)
+
+    # držíme nejnovější start_date napříč všemi stránkami,
+    # aby se checkpoint nastavil přesně na poslední aktivitu ze Stravy
+    newest_activity_start_date = None
 
     # připravíme timestamp pro incremental sync
     after_timestamp = None
@@ -69,6 +72,18 @@ def import_activities(db: Session, user_id):
         print(f"Activities received: {len(activities)}")
 
         for act in activities:
+            start_date_raw = act.get("start_date")
+            start_date = None
+
+            if isinstance(start_date_raw, str):
+                # Strava vrací UTC ISO string, nejčastěji se suffixem "Z"
+                # fromisoformat neumí přímo "Z", proto převod na +00:00
+                start_date = datetime.fromisoformat(start_date_raw.replace("Z", "+00:00"))
+                if start_date.tzinfo is None:
+                    start_date = start_date.replace(tzinfo=timezone.utc)
+
+                if newest_activity_start_date is None or start_date > newest_activity_start_date:
+                    newest_activity_start_date = start_date
 
             # filtrovat sporty
             if act.get("sport_type") not in SUPPORTED_SPORTS:
@@ -78,11 +93,18 @@ def import_activities(db: Session, user_id):
             if not act.get("has_heartrate"):
                 continue
 
+            if start_date is None:
+                # Aktivita bez validního start_date nesmí spadnout celý import,
+                # pouze ji přeskočíme.
+                print(f"Skipping activity {act.get('id')} due to missing or invalid start_date")
+                continue
+
+
             activity = Activity(
                 id=act["id"],
                 user_id=user_id,
                 sport_type=act.get("sport_type"),
-                start_date=act.get("start_date"),
+                start_date=start_date,
                 distance=act.get("distance"),
                 moving_time=act.get("moving_time"),
                 elapsed_time=act.get("elapsed_time"),
@@ -109,13 +131,10 @@ def import_activities(db: Session, user_id):
 
         page += 1
 
-    # Posouváme checkpoint pouze pokud Strava skutečně vrátila nějaké aktivity.
-    # Když API vrátí 0 výsledků (např. kvůli příliš agresivnímu "after"), necháme
-    # původní last_sync pro bezpečný retry bez ztráty dat.
-    if total_fetched > 0:
-        # Uložíme čas začátku synchronizace.
-        # Tím zabráníme mezeře u aktivit, které vznikly během běžícího syncu.
-        user.last_sync = sync_started_at
+    # Posouváme checkpoint pouze pokud Strava skutečně vrátila nějaké aktivity
+    # s validním start_date napříč všemi stránkami.
+    if newest_activity_start_date is not None:
+        user.last_sync = newest_activity_start_date
         db.commit()
     else:
         print("No activities fetched from Strava; keeping previous last_sync.")
