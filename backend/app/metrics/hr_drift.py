@@ -62,50 +62,50 @@ def compute(activity, streams):
     if duration_seconds <= 0:
         duration_seconds = float(len(time))
 
-        hr_mean = _mean(hr)
-        if hr_mean is None or hr_mean <= 0:
-            return None
+    hr_mean = _mean(hr)
+    if hr_mean is None or hr_mean <= 0:
+        return None
 
-        hr_std = _std(hr, hr_mean)
-        hr_cv = hr_std / hr_mean
+    hr_std = _std(hr, hr_mean)
+    hr_cv = hr_std / hr_mean
 
-        sport_type = getattr(activity, "sport_type", None)
-        is_cycling = sport_type in CYCLING_SPORT_TYPES
+    sport_type = getattr(activity, "sport_type", None)
+    is_cycling = sport_type in CYCLING_SPORT_TYPES
 
-        speed_cv = 0.0
-        if is_cycling:
-            if not isinstance(speed_raw, list):
-                print(
+    speed_cv = 0.0
+    if is_cycling:
+        if not isinstance(speed_raw, list):
+            print(
                     f"HR drift eligibility | activity={activity.id} duration={duration_seconds:.1f}s "
                     f"hr_cv={hr_cv:.4f} speed_cv=N/A eligible=False (missing cycling speed stream)"
                 )
-                return None
+            return None
 
-            speed = [x for x in speed_raw if isinstance(x, (int, float)) and x > 0]
-            speed_mean = _mean(speed)
-            if not speed or speed_mean is None or speed_mean <= 0:
-                print(
+        speed = [x for x in speed_raw if isinstance(x, (int, float)) and x > 0]
+        speed_mean = _mean(speed)
+        if not speed or speed_mean is None or speed_mean <= 0:
+            print(
                     f"HR drift eligibility | activity={activity.id} duration={duration_seconds:.1f}s "
                     f"hr_cv={hr_cv:.4f} speed_cv=N/A eligible=False (invalid cycling speed stream)"
                 )
-                return None
+            return None
 
-            speed_std = _std(speed, speed_mean)
-            speed_cv = speed_std / speed_mean
+        speed_std = _std(speed, speed_mean)
+        speed_cv = speed_std / speed_mean
 
-        is_drift_eligible = (
-            duration_seconds >= MIN_DURATION_SECONDS
-            and hr_cv < MAX_HR_CV
-            and (not is_cycling or speed_cv < MAX_SPEED_CV)
+    is_drift_eligible = (
+        duration_seconds >= MIN_DURATION_SECONDS
+        and hr_cv < MAX_HR_CV
+        and (not is_cycling or speed_cv < MAX_SPEED_CV)
         )
 
-        print(
+    print(
             f"HR drift eligibility | activity={activity.id} duration={duration_seconds:.1f}s "
             f"hr_cv={hr_cv:.4f} speed_cv={speed_cv:.4f} eligible={is_drift_eligible}"
         )
 
-        if not is_drift_eligible:
-          return None
+    if not is_drift_eligible:
+        return None
 
     n = len(hr)
     half = n // 2
