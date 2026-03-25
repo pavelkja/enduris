@@ -65,6 +65,7 @@ def get_efficiency_deviation_insight(
 
 
 
+
 # 🔹 READINESS
 @router.get("/dashboard/readiness")
 def get_readiness(
