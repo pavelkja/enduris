@@ -14,6 +14,56 @@ from app.schemas.performance import PerformanceSummary
 
 router = APIRouter()
 
+@router.get("/insight/deviation")
+def get_efficiency_deviation_insight(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    query = text("""
+        SELECT am.value AS efficiency
+        FROM activity_metrics am
+        JOIN activities a ON a.id = am.activity_id
+        WHERE am.user_id = :user_id
+          AND am.metric_name = 'efficiency'
+        ORDER BY a.start_date DESC
+        LIMIT 11;
+    """)
+
+    rows = db.execute(query, {"user_id": user_id}).fetchall()
+    values = [float(row.efficiency) for row in rows if row.efficiency is not None]
+
+    if len(values) < 2:
+        return {
+            "state": "normal",
+            "today": values[0] if values else 0.0,
+            "baseline": values[0] if values else 0.0,
+            "deviation": 0.0,
+        }
+
+    today_value = values[0]
+    baseline_values = values[1:11]
+    baseline_avg = sum(baseline_values) / len(baseline_values)
+
+    if baseline_avg == 0:
+        deviation = 0.0
+    else:
+        deviation = (today_value - baseline_avg) / baseline_avg
+
+    if deviation > 0.05:
+        state = "above"
+    elif deviation < -0.05:
+        state = "below"
+    else:
+        state = "normal"
+
+    return {
+        "state": state,
+        "today": today_value,
+        "baseline": baseline_avg,
+        "deviation": deviation,
+    }
+
+
 
 # 🔹 READINESS
 @router.get("/dashboard/readiness")
