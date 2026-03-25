@@ -24,6 +24,12 @@ class ReadinessService:
             sport_type=sport_type,
         )
 
+        print("=== DEBUG ACTIVITIES ===")
+        print("count:", len(activities))
+
+        for a in activities[:5]:
+            print(a)
+        
         if not activities:
             return self._build_response(
                 status="no_data",
