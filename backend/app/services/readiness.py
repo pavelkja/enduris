@@ -1,218 +1,219 @@
-from typing import List, Dict, Optional
-from datetime import datetime
+from __future__ import annotations
 
+from datetime import datetime, timezone
+from statistics import median
+from typing import Dict, List, Optional
+
+from app.core.readiness_config import ReadinessConfig
 
 class ReadinessService:
-            def __init__(self, metrics_repository):
-                self.metrics_repository = metrics_repository
+      def __init__(self, metrics_repository, config: Optional[ReadinessConfig] = None):
+          self.metrics_repository = metrics_repository
+          self.config = config or ReadinessConfig()
 
-            def get_readiness(self, user_id: str, sport_type: str, limit: int = 7) -> Dict:
+      def get_readiness(self, user_id: str, sport_type: str) -> Dict:
+          activities = self.metrics_repository.get_last_activities_with_metrics(
+              user_id=user_id,
+              sport_type=sport_type,
+              limit=self.config.ROLLING_LONG_WINDOW,
+          )
 
-                activities = self.metrics_repository.get_last_activities_with_metrics(
-                    user_id=user_id,
-                    sport_type=sport_type,
-                    limit=limit
-                )
+          latest_activity_date = self.metrics_repository.get_latest_activity_date(
+              user_id=user_id,
+              sport_type=sport_type,
+          )
 
-                print("==== READINESS DEBUG ====")
-                print("activities count:", len(activities))
-                print("sample activities:", activities[:3])
+          if not activities:
+              return self._build_response(
+                  status="no_data",
+                  confidence="low",
+                  recency_status=self._compute_recency_status(latest_activity_date),
+                  reason="Insufficient activity data to evaluate readiness",
+                  efficiency_delta=0.0,
+                  hr_drift=0.0,
+                  data_points=0,
+              )
 
-                if not activities:
-                    print("❌ No activities returned from repository")
-                    return self._not_enough_data()
+          activities = sorted(
+              activities,
+              key=lambda activity: activity.get("start_date") or datetime.min,
+              reverse=True,
+          )
 
-                # 👉 NEW: latest activity + recency
-                latest_date = self.metrics_repository.get_latest_activity_date(
-                    user_id=user_id,
-                    sport_type=sport_type
-                )
+          efficiency_values = [
+              value
+              for value in (activity.get("efficiency") for activity in activities)
+              if self._is_valid_efficiency(value)
+          ]
 
-                recency_status = self._compute_recency_status(latest_date)
+          hr_drift_values = [
+              value
+              for value in (activity.get("hr_drift") for activity in activities)
+              if self._is_valid_hr_drift(value)
+          ]
 
-                efficiencies = [
-                    a["efficiency"] for a in activities
-                    if a.get("efficiency") is not None
-                ]
+          efficiency_last_5_avg = self._robust_average(
+              efficiency_values[: self.config.ROLLING_SHORT_WINDOW]
+          )
+          efficiency_last_10_avg = self._robust_average(
+              efficiency_values[: self.config.ROLLING_LONG_WINDOW]
+          )
+          hr_drift_avg = self._robust_average(
+              hr_drift_values[: self.config.ROLLING_LONG_WINDOW]
+          )
 
-                hr_drifts = [
-                    a["hr_drift"] for a in activities
-                    if a.get("hr_drift") is not None
-                ]
+          valid_data_points = len(
+              [
+                  activity
+                  for activity in activities
+                  if self._is_valid_efficiency(activity.get("efficiency"))
+                  and self._is_valid_hr_drift(activity.get("hr_drift"))
+              ]
+          )
 
-                print("efficiencies count:", len(efficiencies))
-                print("hr_drifts count:", len(hr_drifts))
+          if not efficiency_values or not hr_drift_values:
+              return self._build_response(
+                  status="no_data",
+                  confidence=self._compute_confidence(valid_data_points),
+                  recency_status=self._compute_recency_status(latest_activity_date),
+                  reason="Missing efficiency or HR drift data",
+                  efficiency_delta=0.0,
+                  hr_drift=0.0,
+                  data_points=valid_data_points,
+              )
 
-                # -------------------------
-                # TRENDY (fallback-safe)
-                # -------------------------
+          return self.evaluate_readiness(
+              efficiency_last_5_avg=efficiency_last_5_avg,
+              efficiency_last_10_avg=efficiency_last_10_avg,
+              hr_drift_avg=hr_drift_avg,
+              data_points=valid_data_points,
+              latest_activity_date=latest_activity_date,
+          )
 
-                efficiency_trend: Optional[str] = (
-                    self._compute_trend(efficiencies) if len(efficiencies) >= 3 else None
-                )
+      def evaluate_readiness(
+          self,
+          efficiency_last_5_avg: Optional[float],
+          efficiency_last_10_avg: Optional[float],
+          hr_drift_avg: Optional[float],
+          data_points: Optional[int],
+          latest_activity_date: Optional[datetime],
+      ) -> Dict:
+          safe_data_points = max(0, int(data_points or 0))
+          confidence = self._compute_confidence(safe_data_points)
+          recency_status = self._compute_recency_status(latest_activity_date)
 
-                drift_trend: Optional[str] = (
-                    self._compute_trend(hr_drifts) if len(hr_drifts) >= 3 else None
-                )
+          if (
+              efficiency_last_5_avg is None
+              or efficiency_last_10_avg is None
+              or hr_drift_avg is None
+          ):
+              return self._build_response(
+                  status="no_data",
+                  confidence=confidence,
+                  recency_status=recency_status,
+                  reason="Missing efficiency or HR drift data",
+                  efficiency_delta=0.0,
+                  hr_drift=float(hr_drift_avg or 0.0),
+                  data_points=safe_data_points,
+              )
 
-                print("eff trend:", efficiency_trend)
-                print("drift trend:", drift_trend)
+          efficiency_delta = self._compute_relative_efficiency_delta(
+              efficiency_last_5_avg,
+              efficiency_last_10_avg,
+          )
 
-                if efficiency_trend is None and drift_trend is None:
-                    print("❌ No usable trends")
-                    return self._not_enough_data()
+          if (
+              efficiency_delta > self.config.EFFICIENCY_THRESHOLD
+              and hr_drift_avg <= self.config.DRIFT_THRESHOLD
+          ):
+              status = "good_day"
+              reason = "Efficiency improving and HR drift stable"
+          elif (
+              efficiency_delta < -self.config.EFFICIENCY_THRESHOLD
+              and hr_drift_avg > self.config.DRIFT_THRESHOLD
+          ):
+              status = "fatigue"
+              reason = "Efficiency declining and HR drift increasing"
+          else:
+              status = "caution"
+              reason = "Mixed signals between efficiency and HR drift"
 
-                # -------------------------
-                # SCORING
-                # -------------------------
+          return self._build_response(
+              status=status,
+              confidence=confidence,
+              recency_status=recency_status,
+              reason=reason,
+              efficiency_delta=efficiency_delta,
+              hr_drift=hr_drift_avg,
+              data_points=safe_data_points,
+          )
 
-                score = 0
+      def _compute_confidence(self, data_points: int) -> str:
+          if data_points < self.config.MIN_DATA_POINTS:
+              return "low"
+          if data_points >= self.config.HIGH_CONFIDENCE_THRESHOLD:
+              return "high"
+          return "medium"
 
-                if efficiency_trend == "up":
-                    score += 1
-                elif efficiency_trend == "down":
-                    score -= 1
+      def _compute_recency_status(self, latest_activity_date: Optional[datetime]) -> str:
+          if latest_activity_date is None:
+              return "stale"
 
-                if drift_trend == "up":
-                    score -= 1
-                elif drift_trend == "down":
-                    score += 1
+          now = datetime.now(timezone.utc)
+          if latest_activity_date.tzinfo is None:
+              latest_activity_date = latest_activity_date.replace(tzinfo=timezone.utc)
+          else:
+              latest_activity_date = latest_activity_date.astimezone(timezone.utc)
 
-                print("score:", score)
+          age_days = (now - latest_activity_date).days
+          return "stale" if age_days > self.config.STALE_DAYS else "fresh"
 
-                # -------------------------
-                # CONFIDENCE (UPDATED)
-                # -------------------------
+      def _robust_average(self, values: List[float]) -> Optional[float]:
+          if not values:
+              return None
 
-                if hr_drifts:
-                    data_points = min(len(efficiencies), len(hr_drifts))
-                else:
-                    data_points = len(efficiencies)
+          method = self.config.ROBUST_AVERAGE_METHOD.lower()
+          sorted_values = sorted(values)
 
-                confidence = self._compute_confidence(data_points, recency_status)
+          if method == "median":
+              return float(median(sorted_values))
 
-                print("confidence:", confidence)
-                print("recency_status:", recency_status)
+          if method == "trimmed_mean":
+              trim_count = int(len(sorted_values) * self.config.TRIM_RATIO)
+              if trim_count > 0 and len(sorted_values) > (2 * trim_count):
+                  sorted_values = sorted_values[trim_count:-trim_count]
 
-                # -------------------------
-                # FINAL OUTPUT
-                # -------------------------
+          return float(sum(sorted_values) / len(sorted_values))
 
-                result = self._interpret(score, efficiency_trend, drift_trend, confidence)
+      def _compute_relative_efficiency_delta(self, last_5_avg: float, last_10_avg: float) -> float:
+          if last_10_avg == 0:
+              return 0.0
+          return (last_5_avg - last_10_avg) / last_10_avg
 
-                # 👉 NEW: doplnění meta info
-                result["recency_status"] = recency_status
-                result["latest_activity_date"] = (
-                    latest_date.isoformat() if latest_date else None
-                )
-                result["data_points"] = data_points
+      def _is_valid_efficiency(self, value: Optional[float]) -> bool:
+          return value is not None and 0 < value < 0.2
 
-                return result
+      def _is_valid_hr_drift(self, value: Optional[float]) -> bool:
+          return value is not None and 0 <= value < 0.2
 
-            # -------------------------
-
-            def _compute_trend(self, values: List[float]) -> str:
-
-                if len(values) < 6:
-                    print("⚠️ Not enough values for full trend → fallback trend")
-
-                    recent_avg = sum(values[:3]) / len(values[:3])
-                    overall_avg = sum(values) / len(values)
-
-                    diff = recent_avg - overall_avg
-                else:
-                    recent = values[:3]
-                    previous = values[3:6]
-
-                    recent_avg = sum(recent) / len(recent)
-                    previous_avg = sum(previous) / len(previous)
-
-                    diff = recent_avg - previous_avg
-
-                threshold = 0.02
-
-                print("trend calc diff:", diff)
-
-                if diff > threshold:
-                    return "up"
-                elif diff < -threshold:
-                    return "down"
-                else:
-                    return "stable"
-
-            # -------------------------
-
-            def _compute_recency_status(self, latest_date) -> str:
-                if not latest_date:
-                    return "no_data"
-
-                delta = (datetime.utcnow() - latest_date).days
-
-                if delta < 7:
-                    return "fresh"
-                elif delta <= 21:
-                    return "moderate"
-                return "stale"
-
-            # -------------------------
-
-            def _compute_confidence(self, data_points: int, recency_status: str) -> str:
-                if data_points < 5:
-                    return "low"
-
-                if recency_status == "fresh":
-                    return "high"
-                elif recency_status == "moderate":
-                    return "medium"
-
-                return "low"
-
-            # -------------------------
-
-            def _interpret(
-                self,
-                score: int,
-                efficiency_trend: Optional[str],
-                drift_trend: Optional[str],
-                confidence: str
-            ) -> Dict:
-
-                # 🔴 tired
-                if score <= -1:
-                    return {
-                        "status": "tired",
-                        "headline": "Dneska spíš klid",
-                        "message": "Výkon klesá nebo se zhoršuje efektivita.",
-                        "coach_message": "Dej si lehkou aktivitu nebo pauzu.",
-                        "confidence": confidence
-                    }
-
-                # 🟢 good day
-                if score >= 1:
-                    return {
-                        "status": "good_day",
-                        "headline": "Dneska to půjde",
-                        "message": "Tělo reaguje dobře a zvládá zátěž.",
-                        "coach_message": "Klidně můžeš přidat.",
-                        "confidence": confidence
-                    }
-
-                # 🟡 ready
-                return {
-                    "status": "ready",
-                    "headline": "Jsi ready",
-                    "message": "Bez výrazného trendu, ale stabilní stav.",
-                    "coach_message": "Jdi podle pocitu.",
-                    "confidence": confidence
-                }
-
-            # -------------------------
-
-            def _not_enough_data(self) -> Dict:
-                return {
-                    "status": "no_data",
-                    "headline": "Málo dat",
-                    "message": "Potřebuju víc aktivit pro vyhodnocení.",
-                    "coach_message": "Ještě chvíli jezdi 🙂",
-                    "confidence": "low"
-                }
+      def _build_response(
+          self,
+          status: str,
+          confidence: str,
+          recency_status: str,
+          reason: str,
+          efficiency_delta: float,
+          hr_drift: float,
+          data_points: int,
+      ) -> Dict:
+          return {
+              "status": status,
+              "confidence": confidence,
+              "recency_status": recency_status,
+              "reason": reason,
+              "metrics": {
+                  "efficiency_delta": round(float(efficiency_delta), 6),
+                  "hr_drift": round(float(hr_drift), 6),
+              },
+              "data_points": data_points,
+          }
