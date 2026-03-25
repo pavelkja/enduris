@@ -1,51 +1,64 @@
-'use client';
+type DeviationInsight = {
+  state: 'above' | 'normal' | 'below';
+  today: number;
+  baseline: number;
+  deviation: number;
+};
 
-import { FactorsList } from '@/components/FactorsList';
-import { InsightBox } from '@/components/InsightBox';
-import { ReadinessScore } from '@/components/ReadinessScore';
-import { SyncStatus } from '@/components/SyncStatus';
-import { TrendChart } from '@/components/TrendChart';
-import { readinessText } from '@/config/content';
-import { mockReadiness } from '@/lib/mockReadiness';
-import { normalizeReadiness } from '@/lib/readiness';
-import { ReadinessResponse } from '@/types/readiness';
-import { useEffect, useState } from 'react';
+const fallbackInsight: DeviationInsight = {
+  state: 'normal',
+  today: 0,
+  baseline: 0,
+  deviation: 0,
+};
 
-export default function HomePage() {
-  const [data, setData] = useState<ReadinessResponse>(mockReadiness);
+function getHeadline(state: DeviationInsight['state']) {
+  if (state === 'above') {
+    return 'Today’s performance is above your usual level.';
+  }
 
-  useEffect(() => {
-    const loadReadiness = async () => {
-      try {
-        const response = await fetch('/api/readiness', { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error('Readiness API unavailable');
-        }
-        const payload = (await response.json()) as Partial<ReadinessResponse>;
-        setData(normalizeReadiness(payload));
-      } catch {
-        setData(mockReadiness);
-      }
-    };
+  if (state === 'below') {
+    return 'Today’s performance is below your usual level.';
+  }
 
-    void loadReadiness();
-  }, []);
+  return 'Today’s performance is within your normal range.';
+}
 
+const BACKEND_URL = process.env.BACKEND_API_URL ?? 'http://localhost:8000/api';
+const USER_ID = process.env.DEMO_USER_ID ?? '00000000-0000-0000-0000-000000000001';
+
+async function getInsight(): Promise<DeviationInsight> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/insight/deviation?user_id=${USER_ID}`, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Deviation API unavailable');
+    }
+
+    return (await response.json()) as DeviationInsight;
+  } catch {
+    return fallbackInsight;
+  }
+}
+
+export default async function HomePage() {
+  const insight = await getInsight();
+  const deviationPercent = Math.round(insight.deviation * 100);
+
+  
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+      <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+        
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">{readinessText.pageTitle}</h1>
-        <p className="mt-2 text-sm text-slate-600">{readinessText.pageSubtitle}</p>
+        <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Main insight</h1>
       </header>
 
-      <div className="mt-6 grid gap-4 sm:gap-5 md:grid-cols-2">
-        <ReadinessScore score={data.score} status={data.status} summary={data.summary} />
-        <SyncStatus syncStatus={data.sync_status} />
-        <FactorsList factors={data.factors} />
-        <InsightBox insight={data.insight} />
-        <div className="md:col-span-2">
-          <TrendChart trend={data.trend} />
-        </div>
+        <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-medium text-slate-900">{getHeadline(insight.state)}</h2>
+          <p className="mt-2 text-sm text-slate-600">Compared to your last 10 activities.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Deviation: {deviationPercent > 0 ? '+' : ''}
+            {deviationPercent}%
+          </p>
       </div>
     </main>
   );
