@@ -78,6 +78,17 @@ def sync_streams_job(user_id: str):
                 activity.streams_imported = True
                 db.commit()
                 print("Streams saved")
+
+                # 👉 compute metrics
+                from app.services.metrics import compute_metrics_for_activity
+
+                compute_metrics_for_activity(
+                   db=db,
+                   activity=activity
+                )
+
+                print("Metrics computed")
+                
             else:
                 print("No streams to save")
 
