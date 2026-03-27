@@ -11,8 +11,8 @@ from app.api.dashboard import router as dashboard_router
 from app.routers import health
 
 # 🔽 RQ importy
-from app.workers.queue_config import queue
-from app.workers.jobs import test_job
+# from app.workers.queue_config import queue
+# from app.workers.jobs import test_job
 
 
 app = FastAPI(
@@ -35,7 +35,7 @@ def root():
 
 
 # 🔽 TEST ENDPOINT PRO RQ
-@app.get("/test-job")
-def run_test_job():
-    job = queue.enqueue(test_job)
-    return {"job_id": job.id}
+# @app.get("/test-job")
+# def run_test_job():
+  #  job = queue.enqueue(test_job)
+  #  return {"job_id": job.id}
