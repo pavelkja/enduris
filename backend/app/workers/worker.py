@@ -7,7 +7,7 @@ def run_worker() -> None:
     connection = get_redis_connection()
     with Connection(connection):
         worker = Worker(["default"])
-        worker.work()
+        worker.work(with_scheduler=True)
 
 
 if __name__ == "__main__":
