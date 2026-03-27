@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 
+from app.workers.jobs.test_job import test_job
+from app.workers.queue import get_default_queue
+
 from app.core.database import Base, engine
 
 from app.models.user import User
@@ -9,11 +12,6 @@ from app.models.activity_metric import ActivityMetric
 
 from app.api.dashboard import router as dashboard_router
 from app.routers import health
-
-# 🔽 RQ importy
-# from app.workers.queue_config import queue
-# from app.workers.jobs import test_job
-
 
 app = FastAPI(
     title="Enduris API",
@@ -33,9 +31,8 @@ app.include_router(health.router)
 def root():
     return {"status": "Enduris backend running"}
 
-
-# 🔽 TEST ENDPOINT PRO RQ
-# @app.get("/test-job")
-# def run_test_job():
-  #  job = queue.enqueue(test_job)
-  #  return {"job_id": job.id}
+@app.post("/api/test-job")
+def enqueue_test_job():
+    queue = get_default_queue()
+    job = queue.enqueue(test_job, 2, 3)
+    return {"job_id": job.id}
