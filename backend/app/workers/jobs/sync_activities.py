@@ -25,6 +25,8 @@ def sync_activities_job(user_id: str):
             access_token=user.access_token,
             page=1,
             per_page=30,
+            db=db,
+            user=user,
         )
 
         print(f"Fetched {len(activities)} activities")
