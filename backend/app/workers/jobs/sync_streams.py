@@ -5,6 +5,7 @@ from app.models.activity import Activity
 from app.models.activity_stream import ActivityStream
 from app.models.user import User
 from app.services.strava_client import get_activity_streams
+from app.services.metrics_runner import compute_metrics_for_activity
 
 
 STREAM_TYPES = ["heartrate", "speed", "altitude", "cadence"]
@@ -79,16 +80,14 @@ def sync_streams_job(user_id: str):
                 db.commit()
                 print("Streams saved")
 
-                # 👉 compute metrics
-                from app.services.metrics import compute_metrics_for_activity
-
+                # 👉 compute metrics (FIXED IMPORT)
                 compute_metrics_for_activity(
-                   db=db,
-                   activity=activity
+                    db=db,
+                    activity=activity
                 )
 
                 print("Metrics computed")
-                
+
             else:
                 print("No streams to save")
 
