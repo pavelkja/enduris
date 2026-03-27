@@ -60,8 +60,3 @@ class MetricsRepository:
         result = query.one_or_none()
 
         return result.latest_date if result and result.latest_date else None
-
-
-        result = self.db.execute(query, params).fetchone()
-
-        return result.latest_date if result and result.latest_date else None
