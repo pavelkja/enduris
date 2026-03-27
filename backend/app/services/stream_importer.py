@@ -35,7 +35,7 @@ def fetch_streams(db: Session, user: User, activity_id):
     if response.status_code == 401:
         print(f"🔑 Token expired for {activity_id}")
 
-        new_token = refresh_access_token(db, user)
+        new_token = refresh_access_token(user, db)
 
         if not new_token:
             return None
