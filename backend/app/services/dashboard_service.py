@@ -98,10 +98,8 @@ def get_dashboard_ytd(db: Session, user_id: str, sport: str) -> list[dict[str, A
     for year in [current_year, current_year - 1, current_year - 2]:
         start = datetime(year, 1, 1, tzinfo=timezone.utc)
 
-        if year == current_year:
-            end = now
-        else:
-            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        # 👉 YTD pro všechny roky (KLÍČOVÁ ZMĚNA)
+        end = datetime(year, now.month, now.day, tzinfo=timezone.utc)
 
         response.append(
             {
