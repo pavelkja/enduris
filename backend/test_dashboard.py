@@ -3,7 +3,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 from app.services.dashboard_service import get_efficiency_trend
 
 # ⚠️ sem dej reálné user_id z DB
