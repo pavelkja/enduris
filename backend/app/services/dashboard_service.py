@@ -34,7 +34,6 @@ def _normalize_sport_filter(sport: str) -> tuple[str, list[str]]:
 
     return normalized, sport_types
 
-
 def _empty_metrics() -> dict[str, float | int]:
     return {
         "distance": 0.0,
@@ -44,7 +43,6 @@ def _empty_metrics() -> dict[str, float | int]:
         "avg_hr": 0.0,
     }
 
-
 def _aggregate_metrics(
     db: Session,
     user_id: str,
@@ -53,13 +51,26 @@ def _aggregate_metrics(
     end: datetime,
 ) -> dict[str, float | int]:
 
+    # 👉 agregace pro všechny aktivity (distance, rides, atd.)
     totals = (
         db.query(
             func.sum(Activity.distance).label("distance"),
             func.count(Activity.id).label("rides"),
             func.sum(Activity.elevation_gain).label("elevation"),
             func.sum(Activity.moving_time).label("time"),
-            # weighted avg HR
+        )
+        .filter(
+            Activity.user_id == user_id,
+            Activity.sport_type.in_(sport_types),
+            Activity.start_date >= start,
+            Activity.start_date < end,
+        )
+        .one()
+    )
+
+    # 👉 agregace pouze pro HR (vážený průměr)
+    hr_totals = (
+        db.query(
             (
                 func.sum(Activity.avg_hr * Activity.moving_time)
                 / func.nullif(func.sum(Activity.moving_time), 0)
@@ -70,7 +81,7 @@ def _aggregate_metrics(
             Activity.sport_type.in_(sport_types),
             Activity.start_date >= start,
             Activity.start_date < end,
-            Activity.avg_hr.isnot(None),  # IMPORTANT FIX
+            Activity.avg_hr.isnot(None),
         )
         .one()
     )
@@ -83,7 +94,7 @@ def _aggregate_metrics(
         "rides": int(totals.rides or 0),
         "elevation": round(float(totals.elevation or 0.0), 2),
         "time": int(totals.time or 0),
-        "avg_hr": round(float(totals.avg_hr or 0.0), 2),
+        "avg_hr": round(float(hr_totals.avg_hr or 0.0), 2),
     }
 
 
@@ -98,10 +109,8 @@ def get_dashboard_ytd(db: Session, user_id: str, sport: str) -> list[dict[str, A
     for year in [current_year, current_year - 1, current_year - 2]:
         start = datetime(year, 1, 1, tzinfo=timezone.utc)
 
-        if year == current_year:
-            end = now
-        else:
-            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        # 👉 YTD pro všechny roky (KLÍČOVÁ ZMĚNA)
+        end = datetime(year, now.month, now.day, tzinfo=timezone.utc)
 
         response.append(
             {
