@@ -1,66 +1,164 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+
 from app.models.activity import Activity
-from app.models.activity_metric import ActivityMetric
 
 
-def get_efficiency_trend(db: Session, user_id: str, limit: int = 30):
-    """
-    Vrátí posledních N aktivit s metrikou efficiency
-    """
+CYCLING_OVERALL_SPORT_TYPES = [
+    "Ride",
+    "GravelRide",
+    "MountainBikeRide",
+    "VirtualRide",
+]
 
-    results = (
-        db.query(
-            Activity.id,
-            Activity.start_date,
-            ActivityMetric.value.label("efficiency")
+
+def _normalize_sport_filter(sport: str) -> tuple[str, list[str]]:
+    sport_map = {
+        "ride": ["Ride"],
+        "run": ["Run"],
+        "cycling_overall": CYCLING_OVERALL_SPORT_TYPES,
+    }
+
+    normalized = sport.lower().strip()
+    sport_types = sport_map.get(normalized)
+
+    if not sport_types:
+        raise ValueError(
+            "Unsupported sport filter. Use one of: ride, run, cycling_overall"
         )
-        .join(
-            ActivityMetric,
-            Activity.id == ActivityMetric.activity_id
+
+    return normalized, sport_types
+
+
+def _empty_metrics() -> dict[str, float | int]:
+    return {
+        "distance": 0.0,
+        "rides": 0,
+        "elevation": 0.0,
+        "time": 0,
+        "avg_hr": 0.0,
+    }
+
+
+def _aggregate_metrics(
+    db: Session,
+    user_id: str,
+    sport_types: list[str],
+    start: datetime,
+    end: datetime,
+) -> dict[str, float | int]:
+
+    totals = (
+        db.query(
+            func.sum(Activity.distance).label("distance"),
+            func.count(Activity.id).label("rides"),
+            func.sum(Activity.elevation_gain).label("elevation"),
+            func.sum(Activity.moving_time).label("time"),
+            # weighted avg HR
+            (
+                func.sum(Activity.avg_hr * Activity.moving_time)
+                / func.nullif(func.sum(Activity.moving_time), 0)
+            ).label("avg_hr"),
         )
         .filter(
             Activity.user_id == user_id,
-            ActivityMetric.metric_name == "efficiency"
+            Activity.sport_type.in_(sport_types),
+            Activity.start_date >= start,
+            Activity.start_date < end,
+            Activity.avg_hr.isnot(None),  # IMPORTANT FIX
         )
-        .order_by(Activity.start_date.desc())
-        .limit(limit)
-        .all()
+        .one()
     )
 
-    # převedeme do listu dictů
-    data = [
-        {
-            "activity_id": r.id,
-            "date": r.start_date,
-            "efficiency": r.efficiency
-        }
-        for r in results
+    if not totals.rides:
+        return _empty_metrics()
+
+    return {
+        "distance": round(float(totals.distance or 0.0) / 1000.0, 2),
+        "rides": int(totals.rides or 0),
+        "elevation": round(float(totals.elevation or 0.0), 2),
+        "time": int(totals.time or 0),
+        "avg_hr": round(float(totals.avg_hr or 0.0), 2),
+    }
+
+
+def get_dashboard_ytd(db: Session, user_id: str, sport: str) -> list[dict[str, Any]]:
+    _, sport_types = _normalize_sport_filter(sport)
+
+    now = datetime.now(timezone.utc)
+    current_year = now.year
+
+    response: list[dict[str, Any]] = []
+
+    for year in [current_year, current_year - 1, current_year - 2]:
+        start = datetime(year, 1, 1, tzinfo=timezone.utc)
+
+        if year == current_year:
+            end = now
+        else:
+            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+
+        response.append(
+            {
+                "year": year,
+                "metrics": _aggregate_metrics(db, user_id, sport_types, start, end),
+            }
+        )
+
+    return response
+
+
+def _first_day_of_month(ts: datetime) -> datetime:
+    return datetime(ts.year, ts.month, 1, tzinfo=timezone.utc)
+
+
+def _shift_month(ts: datetime, months: int) -> datetime:
+    year = ts.year
+    month = ts.month + months
+
+    while month <= 0:
+        month += 12
+        year -= 1
+
+    while month > 12:
+        month -= 12
+        year += 1
+
+    return datetime(year, month, 1, tzinfo=timezone.utc)
+
+
+def get_dashboard_months(db: Session, user_id: str, sport: str) -> list[dict[str, Any]]:
+    _, sport_types = _normalize_sport_filter(sport)
+
+    now = datetime.now(timezone.utc)
+    current_month = _first_day_of_month(now)
+
+    monthly_windows = [
+        ("current_month", current_month),
+        ("same_month_last_year", _shift_month(current_month, -12)),
+        ("same_month_two_years", _shift_month(current_month, -24)),
+        ("previous_month", _shift_month(current_month, -1)),
+        ("previous_month_last_year", _shift_month(current_month, -13)),
     ]
 
-    # otočíme, aby to šlo od nejstarší → nejnovější
-    data.reverse()
+    response: list[dict[str, Any]] = []
 
-    return data
+    for label, month_start in monthly_windows:
+        month_end = _shift_month(month_start, 1)
 
-def compute_trend(data):
-    if len(data) < 5:
-        return "not_enough_data"
+        response.append(
+            {
+                "label": label,
+                "month": month_start.strftime("%Y-%m"),
+                "metrics": _aggregate_metrics(
+                    db, user_id, sport_types, month_start, month_end
+                ),
+            }
+        )
 
-    last_5 = data[-5:]
-    prev_5 = data[-10:-5]
-
-    if len(prev_5) < 5:
-        return "not_enough_data"
-
-    last_avg = sum(d["efficiency"] for d in last_5) / 5
-    prev_avg = sum(d["efficiency"] for d in prev_5) / 5
-
-    diff = last_avg - prev_avg
-
-    # threshold proti šumu
-    if abs(diff) < 0.002:
-        return "stable"
-    elif diff > 0:
-        return "improving"
-    else:
-        return "declining"
+    return response
