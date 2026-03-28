@@ -13,6 +13,7 @@ from app.models.activity_stream import ActivityStream
 from app.models.activity_metric import ActivityMetric
 
 from app.api.dashboard import router as dashboard_router
+from app.routers.dashboard import router as dashboard_v1_router
 from app.routers import health
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app = FastAPI(
 )
 
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(dashboard_v1_router)
 
 # vytvoření tabulek v databázi
 Base.metadata.create_all(bind=engine)
