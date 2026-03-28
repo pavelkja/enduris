@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.activity import Activity
-from app.models.activity_metrics import ActivityMetric
+from app.models.activity_metric import ActivityMetric
 
 
 def get_efficiency_trend(db: Session, user_id: str, limit: int = 30):
