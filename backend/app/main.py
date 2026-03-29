@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.workers.jobs.test_job import test_job
 from app.workers.jobs.sync_activities import sync_activities_job
@@ -19,6 +20,18 @@ from app.routers import health
 app = FastAPI(
     title="Enduris API",
     version="0.1"
+)
+
+# ✅ CORS (DŮLEŽITÉ)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://enduris.app",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(dashboard_router, prefix="/api")
@@ -48,6 +61,7 @@ def enqueue_sync_job(user_id: str):
     queue = get_default_queue()
     job = queue.enqueue(sync_activities_job, user_id)
     return {"job_id": job.id}
+
 
 @app.post("/api/streams-sync")
 def enqueue_streams_sync_job(user_id: str):
