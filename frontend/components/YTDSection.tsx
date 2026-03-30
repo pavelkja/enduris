@@ -13,12 +13,12 @@ type YTDSectionProps = {
   data: YTDData;
 };
 
-function formatValue(value: number | null) {
-  if (value === null || Number.isNaN(value)) {
-    return 'N/A';
+function formatValue(value?: number | null) {
+  if (value == null || Number.isNaN(value)) {
+    return '0';
   }
 
-  return value.toLocaleString();
+  return Number(value).toLocaleString();
 }
 
 export default function YTDSection({ data }: YTDSectionProps) {
