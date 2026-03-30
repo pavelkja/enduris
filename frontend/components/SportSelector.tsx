@@ -24,11 +24,11 @@ export default function SportSelector({ value, onChange, options }: SportSelecto
   const sportOptions = options ?? defaultOptions;
 
   return (
-    <div>
-      <label htmlFor="sport" style={{ display: 'block', marginBottom: 8 }}>
+    <div className="form-block">
+      <label htmlFor="sport" className="form-label">
         Sport
       </label>
-      <select id="sport" value={value} onChange={(e) => onChange(e.target.value)}>
+      <select id="sport" className="select" value={value} onChange={(e) => onChange(e.target.value)}>
         {sportOptions.map((sport) => (
           <option key={sport.value} value={sport.value}>
             {sport.label}
