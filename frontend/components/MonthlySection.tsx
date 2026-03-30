@@ -52,7 +52,7 @@ export default function MonthlySection({ data }: MonthlySectionProps) {
                 <div className="metric">
                   <div className="metric-label">Distance</div>
                   <div className="metric-value">
-                    {formatValue(metrics.distance)}
+                    {formatDistance(metrics.distance)}
                   </div>
                 </div>
 
@@ -66,21 +66,21 @@ export default function MonthlySection({ data }: MonthlySectionProps) {
                 <div className="metric">
                   <div className="metric-label">Elevation</div>
                   <div className="metric-value">
-                    {formatValue(metrics.elevation)}
+                    {formatElevation(metrics.elevation)}
                   </div>
                 </div>
 
                 <div className="metric">
                   <div className="metric-label">Time</div>
                   <div className="metric-value">
-                    {formatValue(metrics.time)}
+                    {formatTime(metrics.time)}
                   </div>
                 </div>
 
                 <div className="metric">
                   <div className="metric-label">Avg HR</div>
                   <div className="metric-value">
-                    {formatValue(metrics.avg_hr)}
+                    {formatHR(metrics.avg_hr)}
                   </div>
                 </div>
               </div>
