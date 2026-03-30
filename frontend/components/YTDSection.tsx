@@ -1,5 +1,6 @@
 import { formatTime, formatDistance, formatElevation, formatHR } from '@/utils/format';
 import React from 'react';
+import DataCard from '@/components/DataCard';
 
 type Metrics = {
   distance: number;
@@ -26,57 +27,55 @@ function formatValue(value?: number | null) {
   return Number(value).toLocaleString();
 }
 
+function getTrend(current: number, previous?: number) {
+  if (previous == null || previous === 0) {
+    return undefined;
+  }
+
+  const change = ((current - previous) / previous) * 100;
+
+  if (change <= 0) {
+    return undefined;
+  }
+
+  return `+${change.toFixed(1)}% vs previous year`;
+}
+
 export default function YTDSection({ data }: YTDSectionProps) {
   if (!data || data.length === 0) {
-    return <p>No YTD data</p>;
+    return <p className="status-message">No YTD data</p>;
   }
 
   const current = data[0];
+  const previous = data[1];
   const metrics = current.metrics;
 
   return (
-    <section className="card">
-      <h2>YTD</h2>
+    <section className="section-card">
+      <h2 className="section-title">Year to Date</h2>
       <div className="metrics-grid">
-        <div className="metric">
-          <div className="metric-label">Year</div>
-          <div className="metric-value">{current.year}</div>
-        </div>
-
-        <div className="metric">
-          <div className="metric-label">Distance</div>
-          <div className="metric-value">
-            {formatDistance(metrics.distance)}
-          </div>
-        </div>
-
-        <div className="metric">
-          <div className="metric-label">Rides</div>
-          <div className="metric-value">
-            {formatValue(metrics.rides)}
-          </div>
-        </div>
-
-        <div className="metric">
-          <div className="metric-label">Elevation</div>
-          <div className="metric-value">
-            {formatElevation(metrics.elevation)}
-          </div>
-        </div>
-
-        <div className="metric">
-          <div className="metric-label">Time</div>
-          <div className="metric-value">
-            {formatTime(metrics.time)}
-          </div>
-        </div>
-
-        <div className="metric">
-          <div className="metric-label">Avg HR</div>
-          <div className="metric-value">
-            {formatHR(metrics.avg_hr)}
-          </div>
-        </div>
+        <DataCard title="Year" value={formatValue(current.year)} />
+        <DataCard
+          title="Distance"
+          value={formatDistance(metrics.distance)}
+          trend={getTrend(metrics.distance, previous?.metrics.distance)}
+        />
+        <DataCard
+          title="Rides"
+          value={formatValue(metrics.rides)}
+          trend={getTrend(metrics.rides, previous?.metrics.rides)}
+        />
+        <DataCard
+          title="Elevation"
+          value={formatElevation(metrics.elevation)}
+          trend={getTrend(metrics.elevation, previous?.metrics.elevation)}
+        />
+        <DataCard
+          title="Time"
+          value={formatTime(metrics.time)}
+          trend={getTrend(metrics.time, previous?.metrics.time)}
+        />
+        <DataCard title="Avg HR" value={formatHR(metrics.avg_hr)} />
       </div>
     </section>
   );

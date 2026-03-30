@@ -1,5 +1,6 @@
 import { formatTime, formatDistance, formatElevation, formatHR } from '@/utils/format';
 import React from 'react';
+import DataCard from '@/components/DataCard';
 
 type Metrics = {
   distance: number;
@@ -29,64 +30,33 @@ function formatValue(value?: number | null) {
 
 export default function MonthlySection({ data }: MonthlySectionProps) {
   return (
-    <section className="card">
-      <h2>Monthly</h2>
+    <section className="section-card">
+      <h2 className="section-title">Monthly</h2>
 
       {data.length === 0 ? (
-        <p>No monthly data available.</p>
+        <p className="status-message">No monthly data available.</p>
       ) : (
-        data.map((month) => {
-          const metrics = month.metrics;
+        <div className="stack">
+          {data.map((month) => {
+            const metrics = month.metrics;
 
-          return (
-            <article
-              key={`${month.label}-${month.month}`}
-              className="card"
-              style={{ marginTop: 12 }}
-            >
-              <h3 style={{ marginTop: 0 }}>
-                {month.label} ({month.month})
-              </h3>
+            return (
+              <article key={`${month.label}-${month.month}`} className="section-card">
+                <h3 className="section-title" style={{ marginBottom: 24 }}>
+                  {month.label} ({month.month})
+                </h3>
 
-              <div className="metrics-grid">
-                <div className="metric">
-                  <div className="metric-label">Distance</div>
-                  <div className="metric-value">
-                    {formatDistance(metrics.distance)}
-                  </div>
+                <div className="metrics-grid">
+                  <DataCard title="Distance" value={formatDistance(metrics.distance)} />
+                  <DataCard title="Rides" value={formatValue(metrics.rides)} />
+                  <DataCard title="Elevation" value={formatElevation(metrics.elevation)} />
+                  <DataCard title="Time" value={formatTime(metrics.time)} />
+                  <DataCard title="Avg HR" value={formatHR(metrics.avg_hr)} />
                 </div>
-
-                <div className="metric">
-                  <div className="metric-label">Rides</div>
-                  <div className="metric-value">
-                    {formatValue(metrics.rides)}
-                  </div>
-                </div>
-
-                <div className="metric">
-                  <div className="metric-label">Elevation</div>
-                  <div className="metric-value">
-                    {formatElevation(metrics.elevation)}
-                  </div>
-                </div>
-
-                <div className="metric">
-                  <div className="metric-label">Time</div>
-                  <div className="metric-value">
-                    {formatTime(metrics.time)}
-                  </div>
-                </div>
-
-                <div className="metric">
-                  <div className="metric-label">Avg HR</div>
-                  <div className="metric-value">
-                    {formatHR(metrics.avg_hr)}
-                  </div>
-                </div>
-              </div>
-            </article>
-          );
-        })
+              </article>
+            );
+          })}
+        </div>
       )}
     </section>
   );
