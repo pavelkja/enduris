@@ -25,6 +25,15 @@ function formatValue(value?: number | null) {
   return Number(value).toLocaleString();
 }
 
+function formatTime(seconds?: number | null) {
+  if (!seconds) return '0h';
+
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+
+  return `${h}h ${m}m`;
+}
+
 export default function YTDSection({ data }: YTDSectionProps) {
   if (!data || data.length === 0) {
     return <p>No YTD data</p>;
@@ -43,7 +52,7 @@ export default function YTDSection({ data }: YTDSectionProps) {
         </div>
 
         <div className="metric">
-          <div className="metric-label">Distance</div>
+          <div className="metric-label">Distance (km)</div>
           <div className="metric-value">{formatValue(metrics.distance)}</div>
         </div>
 
@@ -53,13 +62,13 @@ export default function YTDSection({ data }: YTDSectionProps) {
         </div>
 
         <div className="metric">
-          <div className="metric-label">Elevation</div>
+          <div className="metric-label">Elevation (m)</div>
           <div className="metric-value">{formatValue(metrics.elevation)}</div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Time</div>
-          <div className="metric-value">{formatValue(metrics.time)}</div>
+          <div className="metric-value">{formatTime(metrics.time)}</div>
         </div>
 
         <div className="metric">
