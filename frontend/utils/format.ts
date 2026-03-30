@@ -7,10 +7,10 @@ export function formatTime(seconds?: number | null) {
   return `${h}h ${m}m`;
 }
 
-export function formatDistance(meters?: number | null) {
-  if (!meters) return '0 km';
+export function formatDistance(km?: number | null) {
+  if (!km) return '0 km';
 
-  return `${(meters / 1000).toFixed(1)} km`;
+  return `${km.toFixed(1)} km`;
 }
 
 export function formatElevation(meters?: number | null) {
