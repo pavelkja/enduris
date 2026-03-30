@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import MonthlySection from '@/components/MonthlySection';
 import SportSelector from '@/components/SportSelector';
 import YTDSection from '@/components/YTDSection';
+import brandIcon from '@/pics/branding/enduris-ikona-web2.png';
 
 type Metrics = {
   distance: number;
@@ -43,10 +46,7 @@ export default function DashboardPage() {
         const ytdUrl = `${baseUrl}/api/dashboard/ytd?user_id=${userId}&sport=${sport}`;
         const monthsUrl = `${baseUrl}/api/dashboard/months?user_id=${userId}&sport=${sport}`;
 
-        const [ytdResponse, monthsResponse] = await Promise.all([
-          fetch(ytdUrl),
-          fetch(monthsUrl),
-        ]);
+        const [ytdResponse, monthsResponse] = await Promise.all([fetch(ytdUrl), fetch(monthsUrl)]);
 
         if (!ytdResponse.ok || !monthsResponse.ok) {
           throw new Error('Request failed');
@@ -58,7 +58,6 @@ export default function DashboardPage() {
         // ✅ správně: pole
         setYtdData(Array.isArray(ytdJson) ? ytdJson : []);
         setMonthlyData(Array.isArray(monthsJson) ? monthsJson : []);
-
       } catch (_err) {
         setError('Failed to load data');
       } finally {
@@ -70,28 +69,50 @@ export default function DashboardPage() {
   }, [sport]);
 
   return (
-    <main>
-      <h1>Enduris Dashboard</h1>
-      <SportSelector value={sport} onChange={setSport} />
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="branding">
+          <Image src={brandIcon} alt="Enduris logo" width={28} height={28} priority />
+          <span className="branding-name">ENDURIS.APP</span>
+        </div>
 
-      {loading && <p>Loading...</p>}
-      {error && <p>{error}</p>}
+        <ul className="nav-list">
+          <li>
+            <Link className="nav-link active" href="/dashboard">
+              Dashboard
+            </Link>
+          </li>
+          <li>
+            <Link className="nav-link" href="/">
+              Home
+            </Link>
+          </li>
+        </ul>
+      </aside>
 
-      {!loading && !error && (
-        <>
-          {ytdData.length > 0 ? (
-            <YTDSection data={ytdData} />
-          ) : (
-            <p>No YTD data</p>
+      <main className="page-content">
+        <div className="container">
+          <section className="section-card">
+            <h1 className="section-title">Performance Dashboard</h1>
+            <SportSelector value={sport} onChange={setSport} />
+          </section>
+
+          {loading && <p className="status-message">Loading...</p>}
+          {error && <p className="status-message">{error}</p>}
+
+          {!loading && !error && (
+            <>
+              {ytdData.length > 0 ? <YTDSection data={ytdData} /> : <p className="status-message">No YTD data</p>}
+
+              {monthlyData.length > 0 ? (
+                <MonthlySection data={monthlyData} />
+              ) : (
+                <p className="status-message">No monthly data</p>
+              )}
+            </>
           )}
-
-          {monthlyData.length > 0 ? (
-            <MonthlySection data={monthlyData} />
-          ) : (
-            <p>No monthly data</p>
-          )}
-        </>
-      )}
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }
