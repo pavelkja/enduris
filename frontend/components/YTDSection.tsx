@@ -26,21 +26,12 @@ function formatValue(value?: number | null) {
   return Number(value).toLocaleString();
 }
 
-function formatTime(seconds?: number | null) {
-  if (!seconds) return '0h';
-
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-
-  return `${h}h ${m}m`;
-}
-
 export default function YTDSection({ data }: YTDSectionProps) {
   if (!data || data.length === 0) {
     return <p>No YTD data</p>;
   }
 
-  const current = data[0]; // vezmeme aktuální rok
+  const current = data[0];
   const metrics = current.metrics;
 
   return (
@@ -53,28 +44,38 @@ export default function YTDSection({ data }: YTDSectionProps) {
         </div>
 
         <div className="metric">
-          <div className="metric-label">Distance (km)</div>
-          <div className="metric-value">{formatValue(metrics.distance)}</div>
+          <div className="metric-label">Distance</div>
+          <div className="metric-value">
+            {formatDistance(metrics.distance)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Rides</div>
-          <div className="metric-value">{formatValue(metrics.rides)}</div>
+          <div className="metric-value">
+            {formatValue(metrics.rides)}
+          </div>
         </div>
 
         <div className="metric">
-          <div className="metric-label">Elevation (m)</div>
-          <div className="metric-value">{formatValue(metrics.elevation)}</div>
+          <div className="metric-label">Elevation</div>
+          <div className="metric-value">
+            {formatElevation(metrics.elevation)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Time</div>
-          <div className="metric-value">{formatTime(metrics.time)}</div>
+          <div className="metric-value">
+            {formatTime(metrics.time)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Avg HR</div>
-          <div className="metric-value">{formatValue(metrics.avg_hr)}</div>
+          <div className="metric-value">
+            {formatHR(metrics.avg_hr)}
+          </div>
         </div>
       </div>
     </section>
