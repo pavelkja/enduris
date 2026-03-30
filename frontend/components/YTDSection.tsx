@@ -1,3 +1,4 @@
+import { formatTime, formatDistance, formatElevation, formatHR } from '@/utils/format';
 import React from 'react';
 
 type Metrics = {
@@ -30,7 +31,7 @@ export default function YTDSection({ data }: YTDSectionProps) {
     return <p>No YTD data</p>;
   }
 
-  const current = data[0]; // vezmeme aktuální rok
+  const current = data[0];
   const metrics = current.metrics;
 
   return (
@@ -44,27 +45,37 @@ export default function YTDSection({ data }: YTDSectionProps) {
 
         <div className="metric">
           <div className="metric-label">Distance</div>
-          <div className="metric-value">{formatValue(metrics.distance)}</div>
+          <div className="metric-value">
+            {formatDistance(metrics.distance)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Rides</div>
-          <div className="metric-value">{formatValue(metrics.rides)}</div>
+          <div className="metric-value">
+            {formatValue(metrics.rides)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Elevation</div>
-          <div className="metric-value">{formatValue(metrics.elevation)}</div>
+          <div className="metric-value">
+            {formatElevation(metrics.elevation)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Time</div>
-          <div className="metric-value">{formatValue(metrics.time)}</div>
+          <div className="metric-value">
+            {formatTime(metrics.time)}
+          </div>
         </div>
 
         <div className="metric">
           <div className="metric-label">Avg HR</div>
-          <div className="metric-value">{formatValue(metrics.avg_hr)}</div>
+          <div className="metric-value">
+            {formatHR(metrics.avg_hr)}
+          </div>
         </div>
       </div>
     </section>
