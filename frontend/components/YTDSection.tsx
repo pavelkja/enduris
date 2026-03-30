@@ -1,3 +1,4 @@
+import { formatTime, formatDistance, formatElevation, formatHR } from '@/utils/format';
 import React from 'react';
 
 type Metrics = {
