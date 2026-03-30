@@ -10,6 +10,7 @@ def get_efficiency_trend(user_id: str, sport_type: str = "Ride"):
         SELECT
             a.start_date,
             m.value as efficiency,
+            d.value as hr_drift,
 
             AVG(m.value) OVER (
                 ORDER BY a.start_date
@@ -24,6 +25,9 @@ def get_efficiency_trend(user_id: str, sport_type: str = "Ride"):
         FROM activities a
         JOIN activity_metrics m 
             ON a.id = m.activity_id
+        LEFT JOIN activity_metrics d
+            ON a.id = d.activity_id
+            AND d.metric_name = 'hr_drift'
 
         WHERE 
             a.user_id = :user_id
@@ -43,6 +47,7 @@ def get_efficiency_trend(user_id: str, sport_type: str = "Ride"):
             {
                 "date": row.start_date,
                 "efficiency": row.efficiency,
+                "hr_drift": row.hr_drift,
                 "efficiency_last_5": row.efficiency_last_5,
                 "efficiency_last_10": row.efficiency_last_10,
             }
