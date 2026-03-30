@@ -31,9 +31,10 @@ type MonthlyData = {
 type PerformanceStatus = {
   trend: string;
   confidence: string;
-  variability: string;
+  variability: number | null;
+  stabilityLabel: 'Stable' | 'Moderate' | 'Volatile';
+  variabilityInterpretation: string;
   efficiencyMessage: string;
-  hrDriftMessage: string;
   insightMessage: string;
 }
 
@@ -58,24 +59,70 @@ export default function DashboardPage() {
     return `Efficiency ${direction} by ${Math.abs(deltaPercent).toFixed(1)}% over last 10 activities.`;
   }
 
-  function buildHrDriftMessage(hrDrift?: number | null) {
-    if (hrDrift == null) {
-      return 'HR Drift latest value unavailable.';
+  function calculateVariabilityPercent(
+    data?: Array<{ efficiency?: number | null }>,
+    windowSize = 10
+  ) {
+    const recentValues = (Array.isArray(data) ? data : [])
+      .map((entry) => entry?.efficiency)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      .slice(-windowSize);
+
+    if (recentValues.length < 2) {
+      return null;
     }
 
-    const hrDriftPercent = hrDrift * 100;
-    let classification = 'high fatigue risk';
-    if (hrDriftPercent < 5) {
-      classification = 'excellent';
-    } else if (hrDriftPercent <= 10) {
-      classification = 'moderate';
+    const mean = recentValues.reduce((sum, value) => sum + value, 0) / recentValues.length;
+    if (mean === 0) {
+      return null;
     }
 
-    return `HR Drift latest value: ${hrDriftPercent.toFixed(1)}% (${classification}).`;
+    const variance =
+      recentValues.reduce((sum, value) => sum + (value - mean) ** 2, 0) / recentValues.length;
+    const standardDeviation = Math.sqrt(variance);
+
+    return (standardDeviation / mean) * 100;
   }
 
-  function buildInsightMessage(efficiencyMessage: string, hrDriftMessage: string) {
-    return `Insight: ${efficiencyMessage} ${hrDriftMessage}`;
+  function classifyStability(variabilityPercent: number | null) {
+    if (variabilityPercent == null) {
+      return {
+        label: 'Moderate' as const,
+        interpretation: 'Not enough data to determine stability.',
+      };
+    }
+
+    if (variabilityPercent < 5) {
+      return { label: 'Stable' as const, interpretation: 'Very stable (<5%).' };
+    }
+
+    if (variabilityPercent <= 10) {
+      return { label: 'Moderate' as const, interpretation: 'Stable (5–10%).' };
+    }
+
+    return { label: 'Volatile' as const, interpretation: 'Volatile (>10%).' };
+  }
+
+  function buildInsightMessage(trend: string, stabilityLabel: 'Stable' | 'Moderate' | 'Volatile') {
+    if (trend === 'improving') {
+      if (stabilityLabel === 'Volatile') {
+        return 'You are improving but performance is inconsistent.';
+      }
+      return 'You are improving with stable performance.';
+    }
+
+    if (trend === 'declining') {
+      if (stabilityLabel === 'Volatile') {
+        return 'Performance is declining and inconsistent.';
+      }
+      return 'Performance is declining but remains relatively stable.';
+    }
+
+    if (stabilityLabel === 'Volatile') {
+      return 'Performance is steady overall but activity-to-activity output is inconsistent.';
+    }
+
+    return 'Performance is stable with consistent activity execution.';
   }
 
   useEffect(() => {
@@ -115,18 +162,21 @@ export default function DashboardPage() {
           latestPerformanceData?.efficiency_last_5,
           latestPerformanceData?.efficiency_last_10
         );
-        const hrDriftMessage = buildHrDriftMessage(latestPerformanceData?.hr_drift);
+        const variability = calculateVariabilityPercent(performanceJson?.data);
+        const stability = classifyStability(variability);
+        const trend = String(performanceJson?.trend ?? 'stable');
 
         // ✅ správně: pole
         setYtdData(Array.isArray(ytdJson) ? ytdJson : []);
         setMonthlyData(Array.isArray(monthsJson) ? monthsJson : []);
         setPerformanceStatus({
-          trend: String(performanceJson?.trend ?? 'stable'),
+          trend,
           confidence: String(performanceJson?.confidence ?? 'low'),
-          variability: String(performanceJson?.variability ?? 'stable'),
+          variability,
+          stabilityLabel: stability.label,
+          variabilityInterpretation: stability.interpretation,
           efficiencyMessage,
-          hrDriftMessage,
-          insightMessage: buildInsightMessage(efficiencyMessage, hrDriftMessage),
+          insightMessage: buildInsightMessage(trend, stability.label),
         });
       } catch (_err) {
         setError('Failed to load data');
@@ -177,10 +227,17 @@ export default function DashboardPage() {
                 <div className="metrics-grid">
                   <DataCard title="Trend" value={performanceStatus?.trend ?? 'stable'} />
                   <DataCard title="Confidence" value={performanceStatus?.confidence ?? 'low'} />
-                  <DataCard title="Variability" value={performanceStatus?.variability ?? 'stable'} />
+                  <DataCard
+                    title="Stability"
+                    value={`${performanceStatus?.stabilityLabel ?? 'Moderate'}${
+                      performanceStatus?.variability != null
+                        ? ` (${performanceStatus.variability.toFixed(1)}%)`
+                        : ''
+                    }`}
+                  />
                 </div>
                 <p className="status-message">{performanceStatus?.efficiencyMessage}</p>
-                <p className="status-message">{performanceStatus?.hrDriftMessage}</p>
+                <p className="status-message">{performanceStatus?.variabilityInterpretation}</p>
                 <p className="status-message">{performanceStatus?.insightMessage}</p>
               </section>
 
