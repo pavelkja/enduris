@@ -32,6 +32,9 @@ type PerformanceStatus = {
   trend: string;
   confidence: string;
   variability: string;
+  efficiencyMessage: string;
+  hrDriftMessage: string;
+  insightMessage: string;
 }
 
 const baseUrl = 'https://api.enduris.app';
@@ -44,6 +47,36 @@ export default function DashboardPage() {
   const [performanceStatus, setPerformanceStatus] = useState<PerformanceStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  function buildEfficiencyMessage(last5?: number | null, last10?: number | null) {
+    if (last5 == null || last10 == null || last10 === 0) {
+      return 'Efficiency trend unavailable for the last 10 activities.';
+    }
+
+    const deltaPercent = ((last5 - last10) / last10) * 100;
+    const direction = deltaPercent >= 0 ? 'improving' : 'declining';
+    return `Efficiency ${direction} by ${Math.abs(deltaPercent).toFixed(1)}% over last 10 activities.`;
+  }
+
+  function buildHrDriftMessage(hrDrift?: number | null) {
+    if (hrDrift == null) {
+      return 'HR Drift latest value unavailable.';
+    }
+
+    const hrDriftPercent = hrDrift * 100;
+    let classification = 'high fatigue risk';
+    if (hrDriftPercent < 5) {
+      classification = 'excellent';
+    } else if (hrDriftPercent <= 10) {
+      classification = 'moderate';
+    }
+
+    return `HR Drift latest value: ${hrDriftPercent.toFixed(1)}% (${classification}).`;
+  }
+
+  function buildInsightMessage(efficiencyMessage: string, hrDriftMessage: string) {
+    return `Insight: ${efficiencyMessage} ${hrDriftMessage}`;
+  }
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -75,6 +108,14 @@ export default function DashboardPage() {
         const ytdJson = await ytdResponse.json();
         const monthsJson = await monthsResponse.json();
         const performanceJson = performanceResponse.ok ? await performanceResponse.json() : null;
+        const latestPerformanceData = Array.isArray(performanceJson?.data)
+          ? performanceJson.data[performanceJson.data.length - 1]
+          : null;
+        const efficiencyMessage = buildEfficiencyMessage(
+          latestPerformanceData?.efficiency_last_5,
+          latestPerformanceData?.efficiency_last_10
+        );
+        const hrDriftMessage = buildHrDriftMessage(latestPerformanceData?.hr_drift);
 
         // ✅ správně: pole
         setYtdData(Array.isArray(ytdJson) ? ytdJson : []);
@@ -83,6 +124,9 @@ export default function DashboardPage() {
           trend: String(performanceJson?.trend ?? 'stable'),
           confidence: String(performanceJson?.confidence ?? 'low'),
           variability: String(performanceJson?.variability ?? 'stable'),
+          efficiencyMessage,
+          hrDriftMessage,
+          insightMessage: buildInsightMessage(efficiencyMessage, hrDriftMessage),
         });
       } catch (_err) {
         setError('Failed to load data');
@@ -135,6 +179,9 @@ export default function DashboardPage() {
                   <DataCard title="Confidence" value={performanceStatus?.confidence ?? 'low'} />
                   <DataCard title="Variability" value={performanceStatus?.variability ?? 'stable'} />
                 </div>
+                <p className="status-message">{performanceStatus?.efficiencyMessage}</p>
+                <p className="status-message">{performanceStatus?.hrDriftMessage}</p>
+                <p className="status-message">{performanceStatus?.insightMessage}</p>
               </section>
 
               {ytdData.length > 0 ? <YTDSection data={ytdData} /> : <p className="status-message">No YTD data</p>}
