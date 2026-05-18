@@ -15,7 +15,7 @@ from app.models.activity_metric import ActivityMetric
 
 from app.api.dashboard import router as dashboard_router
 from app.routers.dashboard import router as dashboard_v1_router
-from app.routers import health
+from app.routers import debug, health
 
 app = FastAPI(
     title="Enduris API",
@@ -42,6 +42,7 @@ Base.metadata.create_all(bind=engine)
 
 # registrace routerů
 app.include_router(health.router)
+app.include_router(debug.router)
 
 
 @app.get("/")
